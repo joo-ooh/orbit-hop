@@ -1,0 +1,25 @@
+{
+  "name": "orbit-hop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "궤도점프 (Orbit Hop) - one-tap orbit jumping game",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:dev": "node scripts/build.mjs --dev",
+    "ios": "npm run build && npx cap sync ios && npx cap open ios",
+    "ios:dev": "npm run build:dev && npx cap sync ios && npx cap open ios",
+    "art": "python3 scripts/make_art.py",
+    "store-shots": "node scripts/screenshots.mjs && python3 scripts/frame_screenshots.py"
+  },
+  "dependencies": {
+    "@capacitor/core": "8.5.3",
+    "@capacitor/haptics": "8.0.2",
+    "@capacitor/ios": "8.5.3",
+    "@capacitor/preferences": "8.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3",
+    "playwright": "1.56.1"
+  }
+}

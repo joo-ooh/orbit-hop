@@ -1,0 +1,12 @@
+{
+  "appId": "com.yourname.orbithop",
+  "appName": "궤도점프",
+  "webDir": "www",
+  "backgroundColor": "#170f2e",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#170f2e",
+    "scrollEnabled": false,
+    "allowsLinkPreview": false
+  }
+}

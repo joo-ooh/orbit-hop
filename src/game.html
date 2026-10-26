@@ -1,0 +1,842 @@
+<title>궤도점프 Orbit Hop</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gothic+A1:wght@400;700&display=swap">
+<style>
+/* Layout: one full-bleed canvas (a vertical climb through space), HTML overlays float on top. Single dark world by choice. */
+:root {
+  --void: #170f2e;
+  --void-2: #2b1747;
+  --ink: #f6eefc;
+  --muted: #b7a6d6;
+  --apricot: #ffb36b;
+  --rose: #ff6f91;
+  --mint: #7af0c8;
+  --panel: rgba(30, 18, 56, 0.78);
+  --line: rgba(246, 238, 252, 0.14);
+  --display: "Black Han Sans", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --body: "Gothic A1", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--body);
+  overflow: hidden;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  word-break: keep-all;
+}
+#stage { position: fixed; inset: 0; }
+canvas { display: block; width: 100%; height: 100%; }
+
+.hud {
+  position: fixed; left: 0; right: 0; top: 0;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 14px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; justify-content: space-between; align-items: flex-start;
+  pointer-events: none;
+}
+.hud-right { display: flex; gap: 8px; }
+.score {
+  font-family: var(--display);
+  font-size: clamp(44px, 12vw, 64px);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 4px 24px rgba(255, 111, 145, 0.35);
+}
+.best { font-size: 13px; color: var(--muted); letter-spacing: 0.06em; margin-top: 6px; }
+.badge { display: inline-block; margin-top: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--void); background: var(--mint); border-radius: 999px; padding: 3px 9px; }
+.icon-btn {
+  pointer-events: auto;
+  min-width: 44px; height: 44px; border-radius: 22px; padding: 0 12px;
+  border: 1px solid var(--line);
+  background: var(--panel); color: var(--ink);
+  font: 700 13px var(--body); cursor: pointer;
+}
+button:focus-visible, input:focus-visible { outline: 3px solid var(--apricot); outline-offset: 3px; }
+
+.screen {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; text-align: center;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: calc(env(safe-area-inset-top, 0px) + 24px) calc(env(safe-area-inset-bottom, 0px) + 24px);
+  overflow-y: auto;
+}
+.screen.dim { background: rgba(23, 15, 46, 0.55); }
+#menu { background: radial-gradient(ellipse at 50% 45%, rgba(23, 15, 46, 0.82) 0%, rgba(23, 15, 46, 0.55) 60%, rgba(23, 15, 46, 0.25) 100%); }
+.eyebrow { font-size: 12px; letter-spacing: 0.32em; color: var(--apricot); text-transform: uppercase; font-weight: 700; }
+.title {
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(64px, 20vw, 116px);
+  line-height: 0.9; margin: 0;
+  background: linear-gradient(170deg, var(--ink) 20%, var(--apricot) 60%, var(--rose));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-wrap: balance; cursor: default;
+}
+.menu-best { font-size: 14px; color: var(--muted); letter-spacing: 0.04em; }
+.menu-best b { font-family: var(--display); font-weight: 400; color: var(--ink); font-size: 20px; margin-left: 4px; font-variant-numeric: tabular-nums; }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  padding: 24px 22px;
+  width: min(340px, 100%);
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.section-label { font-size: 11px; letter-spacing: 0.16em; color: var(--muted); font-weight: 700; }
+.final { font-family: var(--display); font-size: 88px; line-height: 1; font-variant-numeric: tabular-nums; }
+.reason { font-size: 14px; line-height: 1.5; color: var(--ink); background: rgba(255, 111, 145, 0.14); border: 1px solid rgba(255, 111, 145, 0.35); border-radius: 14px; padding: 8px 14px; text-wrap: balance; }
+.note { font-size: 12px; color: var(--mint); }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
+.stat { display: flex; flex-direction: column; gap: 4px; padding: 12px 8px; border-radius: 16px; background: rgba(246, 238, 252, 0.06); }
+.stat b { font-family: var(--display); font-weight: 400; font-size: 24px; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 11px; letter-spacing: 0.12em; color: var(--muted); }
+.record { color: var(--apricot); font-weight: 700; letter-spacing: 0.1em; font-size: 14px; }
+.unlock { color: var(--apricot); font-weight: 700; font-size: 13px; }
+.btns { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.cta {
+  width: 100%; border: 0; border-radius: 999px; padding: 16px 20px;
+  background: linear-gradient(135deg, var(--apricot), var(--rose));
+  color: #2a0f2e; font: 400 22px var(--display); cursor: pointer;
+  box-shadow: 0 10px 30px rgba(255, 111, 145, 0.35);
+}
+.ghost {
+  width: 100%; border: 1px solid var(--line); border-radius: 999px; padding: 13px 18px;
+  background: rgba(246, 238, 252, 0.05); color: var(--ink); font: 700 15px var(--body); cursor: pointer;
+}
+.cta:active, .ghost:active { transform: scale(0.97); }
+.trails { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.trail-dot { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.trail-dot[aria-pressed="true"] { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(246, 238, 252, 0.15); }
+.trail-dot:disabled { opacity: 0.25; cursor: default; }
+.hint { font-size: 12px; color: var(--muted); }
+.howto { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; text-align: left; width: 100%; }
+.howto li { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; font-size: 14px; line-height: 1.5; }
+.howto li span:first-child { font-family: var(--display); color: var(--apricot); font-size: 18px; line-height: 1.3; }
+
+/* operator panel */
+.admin-card { width: min(380px, 100%); align-items: stretch; text-align: left; gap: 12px; }
+.admin-card h2 { font-family: var(--display); font-weight: 400; font-size: 28px; margin: 0; text-align: center; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.row label { font-size: 14px; font-weight: 700; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.row label small { font-weight: 400; font-size: 12px; color: var(--muted); }
+.row input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--mint); flex: none; }
+.row input[type="range"] { width: 120px; accent-color: var(--mint); flex: none; }
+.row input[type="number"] { width: 72px; flex: none; background: rgba(246, 238, 252, 0.08); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 8px; font: 700 15px var(--mono); text-align: center; }
+.row output { font: 700 13px var(--mono); color: var(--mint); min-width: 44px; text-align: right; }
+.admin-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.admin-actions .ghost { font-size: 13px; padding: 11px 10px; }
+.danger { border-color: rgba(255, 111, 145, 0.5); color: var(--rose); }
+
+.debug {
+  position: fixed; left: max(12px, env(safe-area-inset-left, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  font: 11px/1.5 var(--mono); color: var(--mint); background: rgba(23, 15, 46, 0.75);
+  border: 1px solid rgba(122, 240, 200, 0.3); border-radius: 10px; padding: 8px 10px;
+  white-space: pre; pointer-events: none;
+}
+.toast {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
+  transform: translateX(-50%);
+  background: var(--panel); border: 1px solid rgba(255, 179, 107, 0.4);
+  padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: 14px;
+  white-space: nowrap; pointer-events: none;
+}
+</style>
+
+<div id="stage"><canvas id="c"></canvas></div>
+
+<div class="hud">
+  <div>
+    <div class="score" id="score" hidden>0</div>
+    <div class="best" id="bestHud" hidden>최고 0</div>
+    <div class="badge" id="adminBadge" hidden>운영자 모드</div>
+  </div>
+  <div class="hud-right">
+    <button class="icon-btn" id="pause" aria-label="일시정지" hidden>II</button>
+    <button class="icon-btn" id="mute" aria-label="소리 끄기">소리</button>
+    <button class="icon-btn" id="vibe" aria-label="진동 끄기">진동</button>
+  </div>
+</div>
+
+<!-- Main menu -->
+<div class="screen" id="menu">
+  <div class="eyebrow">Orbit Hop</div>
+  <h1 class="title" id="title">궤도<br>점프</h1>
+  <div class="menu-best">최고 기록 <b id="menuBest">0</b></div>
+  <div class="card">
+    <div class="btns">
+      <button class="cta" id="play">게임 시작</button>
+      <button class="ghost" id="howBtn">게임 방법</button>
+    </div>
+    <div class="section-label">꼬리 색상</div>
+    <div class="trails" data-trails></div>
+    <div class="hint" data-trail-hint></div>
+  </div>
+</div>
+
+<!-- How to play -->
+<div class="screen dim" id="how" hidden>
+  <div class="card">
+    <div class="eyebrow">게임 방법</div>
+    <ol class="howto">
+      <li><span>1</span><span>화면을 탭하면 도는 방향 그대로 궤도를 벗어나 직선으로 날아가요.</span></li>
+      <li><span>2</span><span>다음 행성의 점선 궤도 안으로 들어가면 착지 성공이에요.</span></li>
+      <li><span>3</span><span>궤도 가장자리를 스치듯 들어가면 PERFECT. 연속으로 성공하면 점수가 커져요.</span></li>
+      <li><span>4</span><span>행성 바깥의 링이 다 줄어들기 전에 뛰어야 해요. 다 줄어들면 게임이 끝나요.</span></li>
+    </ol>
+    <button class="cta" id="howClose">알겠어요</button>
+  </div>
+</div>
+
+<!-- Pause -->
+<div class="screen dim" id="paused" hidden>
+  <div class="card">
+    <div class="eyebrow">일시정지</div>
+    <div class="btns">
+      <button class="cta" id="resume">계속하기</button>
+      <button class="ghost" id="pauseMenu">메뉴로</button>
+    </div>
+  </div>
+</div>
+
+<!-- Game over -->
+<div class="screen" id="over" hidden>
+  <div class="card">
+    <div class="eyebrow">이번 기록</div>
+    <div class="final" id="final">0</div>
+    <div class="record" id="record" hidden>새 최고 기록!</div>
+    <div class="reason" id="reason" hidden></div>
+    <div class="note" id="cheatNote" hidden>운영자 설정을 켠 판이라 기록은 저장되지 않았어요</div>
+    <div class="stats">
+      <div class="stat"><b id="bestOut">0</b><span>최고 점수</span></div>
+      <div class="stat"><b id="perfOut">0</b><span>PERFECT</span></div>
+    </div>
+    <div class="unlock" id="unlock" hidden></div>
+    <div class="trails" data-trails></div>
+    <div class="hint" data-trail-hint></div>
+    <div class="btns">
+      <button class="cta" id="retry">다시 도전</button>
+      <button class="ghost" id="overMenu">메뉴로</button>
+    </div>
+  </div>
+</div>
+
+<!-- Operator mode -->
+<div class="screen dim" id="admin" hidden>
+  <div class="card admin-card">
+    <div class="eyebrow" style="text-align:center">Operator</div>
+    <h2>운영자 모드</h2>
+    <div class="row">
+      <label for="aGod">무적<small>궤도를 놓치거나 시간이 끝나도 현재 행성으로 돌아와요</small></label>
+      <input type="checkbox" id="aGod">
+    </div>
+    <div class="row">
+      <label for="aNoTimer">타이머 끄기<small>링이 줄어들지 않아요</small></label>
+      <input type="checkbox" id="aNoTimer">
+    </div>
+    <div class="row">
+      <label for="aAim">조준선<small>날아갈 방향을 점선으로 보여줘요</small></label>
+      <input type="checkbox" id="aAim">
+    </div>
+    <div class="row">
+      <label for="aInfo">실시간 정보<small>행성 번호, 궤도 크기, 속도, 타이머, FPS</small></label>
+      <input type="checkbox" id="aInfo">
+    </div>
+    <div class="row">
+      <label for="aStart">시작 행성<small>후반 난이도를 바로 테스트해요 (0 = 처음)</small></label>
+      <input type="number" id="aStart" min="0" max="200" step="1" inputmode="numeric" value="0">
+    </div>
+    <div class="row">
+      <label for="aSpeed">게임 속도<small>슬로모션이나 빨리 감기</small></label>
+      <input type="range" id="aSpeed" min="0.25" max="2" step="0.25" value="1">
+      <output id="aSpeedOut" for="aSpeed">1.00×</output>
+    </div>
+    <div class="row">
+      <label for="aUnlock">꼬리 전부 해금<small>점수와 상관없이 모든 색상을 쓸 수 있어요</small></label>
+      <input type="checkbox" id="aUnlock">
+    </div>
+    <div class="admin-actions">
+      <button class="ghost" id="aDefaults">설정 초기화</button>
+      <button class="ghost danger" id="aResetBest">최고 기록 삭제</button>
+    </div>
+    <div class="btns">
+      <button class="cta" id="aPlay">이 설정으로 시작</button>
+      <button class="ghost" id="aClose">닫기</button>
+    </div>
+  </div>
+</div>
+
+<div class="debug" id="debug" hidden></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+// Native bridge (only present inside the Capacitor app build)
+const nativePlugin = name => {
+  const C = window.Capacitor;
+  if (!C || !C.isNativePlatform || !C.isNativePlatform()) return null;
+  return (C.Plugins && C.Plugins[name]) || (C.registerPlugin ? C.registerPlugin(name) : null);
+};
+// the app build sets OH_CONFIG.operator = false to remove operator mode
+const OPERATOR = !(window.OH_CONFIG && window.OH_CONFIG.operator === false);
+const SAVE_KEYS = ['oh_best', 'oh_trail', 'oh_muted', 'oh_vibe', 'oh_admin'];
+
+function game() {
+  const cv = document.getElementById('c');
+  const ctx = cv.getContext('2d');
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) {
+      try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
+      // iOS can purge WebView storage, so the app also keeps a native copy
+      const prefs = nativePlugin('Preferences');
+      if (prefs) prefs.set({ key: k, value: JSON.stringify(v) }).catch(() => {});
+    }
+  };
+
+  // Trail skins, unlocked by best score
+  const TRAILS = [
+    { name: '살구', need: 0, c: ['#ffb36b', '#ff6f91'] },
+    { name: '민트', need: 10, c: ['#7af0c8', '#3fb6ff'] },
+    { name: '라벤더', need: 25, c: ['#c7a0ff', '#ff8be0'] },
+    { name: '태양', need: 50, c: ['#fff27a', '#ff7a3d'] },
+    { name: '오로라', need: 100, c: ['#7affd4', '#b47aff'] },
+  ];
+  const PLANET_HUES = [['#ff9f7a', '#c2456b'], ['#8fd3ff', '#3b5bd6'], ['#b6f28a', '#2f9e78'], ['#ffd36e', '#e0723a'], ['#e3a6ff', '#7646c9'], ['#ff8fb6', '#b23a7a']];
+
+  // Operator settings
+  const ADMIN_DEFAULTS = { god: false, noTimer: false, aim: false, info: false, startN: 0, timeScale: 1, unlockAll: false };
+  let admin = Object.assign({}, ADMIN_DEFAULTS, store.get('oh_admin', {}));
+  const adminActive = () => admin.god || admin.noTimer || admin.aim || admin.info || admin.startN > 0 || admin.timeScale !== 1 || admin.unlockAll;
+  // settings that make a run unfair for the leaderboard
+  const runIsCheated = () => admin.god || admin.noTimer || admin.aim || admin.startN > 0 || admin.timeScale !== 1;
+
+  let W = 0, H = 0, DPR = 1, U = 1;
+  let best = store.get('oh_best', 0);
+  let trailIdx = store.get('oh_trail', 0);
+  let muted = store.get('oh_muted', false);
+  let vibe = store.get('oh_vibe', true);
+  let state = 'menu'; // menu | play | paused | over
+  let planets, player, cam, particles, floaters, trail, score, combo, perfects, shake, flash, passed, cheated;
+  let stars = [];
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    U = Math.min(W, H * 0.62) / 400;
+    stars = [];
+    for (let i = 0; i < 140; i++) stars.push({ x: Math.random() * W, y: Math.random() * H, z: 0.15 + Math.random() * 0.85, t: Math.random() * 6 });
+  }
+
+  // ---------- Audio ----------
+  let ac = null;
+  function audio() {
+    if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch { ac = null; } }
+    if (ac && ac.state === 'suspended') ac.resume();
+    return ac;
+  }
+  function tone(freq, dur, type = 'sine', vol = 0.18, slide = 0) {
+    if (muted || !ac) return;
+    const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur);
+  }
+  const SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
+  const sfx = {
+    launch() { tone(320, 0.12, 'triangle', 0.1, 260); },
+    land(c) { const n = SCALE[Math.min(c, SCALE.length - 1)]; tone(440 * Math.pow(2, n / 12), 0.22, 'sine', 0.2); },
+    perfect(c) { const n = SCALE[Math.min(c, SCALE.length - 1)]; const f = 523 * Math.pow(2, n / 12); tone(f, 0.25, 'sine', 0.18); setTimeout(() => tone(f * 1.5, 0.3, 'sine', 0.14), 70); },
+    die() { tone(220, 0.6, 'sawtooth', 0.12, -180); },
+    click() { tone(660, 0.06, 'triangle', 0.08); },
+  };
+  // kind: 'light' | 'medium' | 'error'. Native haptics in the app, Vibration API in browsers that have it
+  const VIBRATE_MS = { light: 10, medium: 25, error: [40, 40, 80] };
+  function haptic(kind) {
+    if (!vibe) return;
+    const h = nativePlugin('Haptics');
+    if (h) {
+      const call = kind === 'error' ? h.notification({ type: 'ERROR' }) : h.impact({ style: kind === 'medium' ? 'MEDIUM' : 'LIGHT' });
+      if (call && call.catch) call.catch(() => {});
+      return;
+    }
+    try { navigator.vibrate && navigator.vibrate(VIBRATE_MS[kind]); } catch {}
+  }
+
+  // ---------- World ----------
+  function difficulty(n) {
+    // early planets get a size bonus that fades out by planet 5
+    const orbitR = U * (Math.max(36, 64 - n * 0.9) + Math.max(0, 5 - n) * 7);
+    // starts slow, speeds up until planet 20, then holds steady
+    const speed = U * (110 + Math.min(n, 20) * 7);
+    // timer always allows at least 1.5 laps, so big slow orbits get more time
+    const lap = (Math.PI * 2 * orbitR) / speed;
+    return {
+      orbitR,
+      bodyR: orbitR * 0.42,
+      gap: U * (175 + Math.min(n, 40) * 2.6 + Math.random() * 40),
+      speed,
+      life: Math.max(2.4, 5 - n * 0.06, lap * 1.5),
+      drift: n > 6 && Math.random() < Math.min(0.75, 0.3 + n * 0.015) ? U * (35 + Math.min(n, 60) * 1.4) * (Math.random() < 0.5 ? -1 : 1) : 0,
+    };
+  }
+  function makePlanet(n, prev) {
+    const d = difficulty(n);
+    const margin = d.orbitR + 18 * U;
+    const minX = Math.max(margin, W / 2 - 190 * U), maxX = Math.min(W - margin, W / 2 + 190 * U);
+    let x = minX + Math.random() * (maxX - minX);
+    if (prev && Math.abs(x - prev.x) < 40 * U) x = x < W / 2 ? Math.min(maxX, x + 90 * U) : Math.max(minX, x - 90 * U);
+    return {
+      n, x, y: prev ? prev.y - Math.max(d.gap, prev.orbitR + d.orbitR + 70 * U) : 0,
+      R: d.bodyR, orbitR: d.orbitR, speed: d.speed, life: d.life,
+      vx: d.drift, minX, maxX,
+      hue: PLANET_HUES[n % PLANET_HUES.length],
+      spin: Math.random() * Math.PI * 2, ring: Math.random() < 0.35,
+      pop: 0,
+    };
+  }
+
+  function reset(startN = 0) {
+    planets = [];
+    const p0 = makePlanet(startN, null); p0.x = W / 2; p0.y = 0; p0.vx = 0; p0.life = 99;
+    planets.push(p0);
+    for (let i = 1; i < 4; i++) planets.push(makePlanet(startN + i, planets[i - 1]));
+    player = { x: 0, y: 0, vx: 0, vy: 0, mode: 'orbit', planet: p0, ang: Math.PI * 0.75, launchAng: Math.PI * 0.75, r: p0.orbitR, dir: 1, timer: 0, flyT: 0 };
+    cam = { y: p0.y - H * 0.66, shakeX: 0, shakeY: 0 };
+    particles = []; floaters = []; trail = [];
+    score = 0; combo = 0; perfects = 0; shake = 0; flash = 0; passed = startN;
+    placeOnOrbit();
+  }
+
+  function placeOnOrbit() {
+    const p = player.planet;
+    player.x = p.x + Math.cos(player.ang) * player.r;
+    player.y = p.y + Math.sin(player.ang) * player.r;
+  }
+
+  function burst(x, y, colors, count, power) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, s = (0.3 + Math.random()) * power * U;
+      particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1, decay: 0.9 + Math.random() * 1.2, size: (1.5 + Math.random() * 3) * U, c: colors[i % colors.length] });
+    }
+  }
+  function floatText(x, y, text, color, big) { floaters.push({ x, y, text, color, life: 1, big }); }
+
+  // ---------- Input ----------
+  function tap() {
+    if (state !== 'play' || player.mode !== 'orbit') return;
+    audio();
+    const p = player.planet;
+    const tx = -Math.sin(player.ang) * player.dir, ty = Math.cos(player.ang) * player.dir;
+    const fs = U * 640;
+    player.vx = tx * fs + p.vx; player.vy = ty * fs;
+    player.launchAng = player.ang;
+    player.mode = 'fly'; player.flyT = 0;
+    sfx.launch();
+    burst(player.x, player.y, TRAILS[trailIdx].c, 8, 90);
+  }
+
+  function capture(p) {
+    const qx = player.x - p.x, qy = player.y - p.y;
+    const sp = Math.hypot(player.vx, player.vy) || 1;
+    const cross = qx * player.vy - qy * player.vx;
+    const b = Math.abs(cross) / sp; // impact parameter: how close the straight path would pass to the center
+    const perfect = b > p.orbitR * 0.66;
+    player.mode = 'orbit'; player.planet = p; player.dir = cross >= 0 ? 1 : -1;
+    player.ang = Math.atan2(qy, qx); player.r = Math.hypot(qx, qy); player.timer = 0;
+    p.pop = 1;
+    passed = p.n;
+    let gain = 1;
+    if (perfect) { combo++; perfects++; gain = 1 + combo; sfx.perfect(combo); flash = 0.35; shake = 6; haptic('medium'); }
+    else { combo = 0; sfx.land(passed % 8); shake = 3; haptic('light'); }
+    score += gain;
+    $('score').textContent = score;
+    floatText(p.x, p.y - p.orbitR - 18 * U, perfect ? (combo > 1 ? `PERFECT ×${combo}` : 'PERFECT') : `+${gain}`, perfect ? '#ffb36b' : '#f6eefc', perfect);
+    burst(player.x, player.y, perfect ? ['#fff', ...TRAILS[trailIdx].c] : p.hue, perfect ? 28 : 14, perfect ? 220 : 130);
+    // keep 3 planets ahead, drop old ones
+    while (planets.length && planets[0].n < p.n - 1) planets.shift();
+    while (planets[planets.length - 1].n < p.n + 3) planets.push(makePlanet(planets[planets.length - 1].n + 1, planets[planets.length - 1]));
+  }
+
+  // operator invincibility: put the player back on the current planet
+  function respawn(msg) {
+    const p = player.planet;
+    player.mode = 'orbit'; player.ang = player.launchAng; player.r = p.orbitR; player.timer = 0;
+    placeOnOrbit(); trail = [];
+    combo = 0; shake = 6;
+    floatText(p.x, p.y - p.orbitR - 18 * U, msg, '#7af0c8', true);
+  }
+
+  function die(reason) {
+    if (state !== 'play') return;
+    if (admin.god) { respawn('무적'); return; }
+    state = 'over';
+    $('pause').hidden = true;
+    sfx.die(); haptic('error');
+    shake = 14;
+    burst(player.x, player.y, ['#fff', '#ff6f91', '#ffb36b'], 40, 260);
+    const prevBest = best;
+    const isRecord = !cheated && score > best;
+    if (isRecord) { best = score; store.set('oh_best', best); }
+    setTimeout(() => showOver(isRecord, reason, prevBest), 650);
+  }
+
+  // ---------- Screens ----------
+  const SCREENS = ['menu', 'how', 'paused', 'over', 'admin'];
+  function show(id) { SCREENS.forEach(s => { $(s).hidden = s !== id; }); }
+
+  function showOver(isRecord, reason, prevBest) {
+    $('final').textContent = score;
+    $('bestOut').textContent = best;
+    $('perfOut').textContent = perfects;
+    $('record').hidden = !isRecord;
+    $('reason').textContent = reason || '';
+    $('reason').hidden = !reason;
+    $('cheatNote').hidden = !cheated;
+    const unlocked = TRAILS.filter(t => t.need > prevBest && t.need <= best);
+    if (unlocked.length) {
+      const t = unlocked[unlocked.length - 1];
+      trailIdx = TRAILS.indexOf(t); store.set('oh_trail', trailIdx);
+      $('unlock').textContent = `새 꼬리 해금: ${t.name}`;
+      $('unlock').hidden = false;
+    } else $('unlock').hidden = true;
+    renderTrails(); syncBest();
+    show('over');
+    setTimeout(() => $('retry').focus({ preventScroll: true }), 50);
+  }
+
+  const trailUnlocked = t => admin.unlockAll || best >= t.need;
+  function renderTrails() {
+    document.querySelectorAll('[data-trails]').forEach(box => {
+      box.innerHTML = '';
+      TRAILS.forEach((t, i) => {
+        const b = document.createElement('button');
+        b.className = 'trail-dot';
+        b.style.background = `linear-gradient(135deg, ${t.c[0]}, ${t.c[1]})`;
+        b.disabled = !trailUnlocked(t);
+        b.setAttribute('aria-pressed', String(i === trailIdx));
+        b.setAttribute('aria-label', trailUnlocked(t) ? t.name : `${t.name} (최고 ${t.need}점에 해금)`);
+        b.addEventListener('click', () => { trailIdx = i; store.set('oh_trail', i); sfx.click(); renderTrails(); });
+        box.appendChild(b);
+      });
+    });
+    const next = TRAILS.find(t => !trailUnlocked(t));
+    document.querySelectorAll('[data-trail-hint]').forEach(h => {
+      h.textContent = next ? `다음 꼬리 '${next.name}'까지 ${next.need - best}점` : '모든 꼬리를 모았어요';
+    });
+  }
+  function syncBest() {
+    $('bestHud').textContent = `최고 ${best}`;
+    $('menuBest').textContent = best;
+  }
+  let toastT;
+  function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2000); }
+
+  function start() {
+    audio();
+    reset(admin.startN);
+    cheated = runIsCheated();
+    state = 'play';
+    show(null);
+    $('score').hidden = false; $('score').textContent = '0';
+    $('bestHud').hidden = false; $('pause').hidden = false;
+  }
+  function goMenu() {
+    state = 'menu';
+    reset(0);
+    $('score').hidden = true; $('bestHud').hidden = true; $('pause').hidden = true;
+    renderTrails(); syncBest();
+    show('menu');
+  }
+  function pause() {
+    if (state !== 'play') return;
+    state = 'paused'; show('paused');
+    setTimeout(() => $('resume').focus({ preventScroll: true }), 30);
+  }
+  function resume() { if (state !== 'paused') return; state = 'play'; show(null); last = performance.now(); }
+
+  // ---------- Operator panel ----------
+  let adminReturn = 'menu';
+  function openAdmin() {
+    adminReturn = state === 'over' ? 'over' : 'menu';
+    $('aGod').checked = admin.god; $('aNoTimer').checked = admin.noTimer; $('aAim').checked = admin.aim;
+    $('aInfo').checked = admin.info; $('aStart').value = admin.startN; $('aSpeed').value = admin.timeScale;
+    $('aUnlock').checked = admin.unlockAll;
+    $('aSpeedOut').textContent = admin.timeScale.toFixed(2) + '×';
+    resetConfirm = false; $('aResetBest').textContent = '최고 기록 삭제';
+    show('admin');
+  }
+  function readAdmin() {
+    admin.god = $('aGod').checked; admin.noTimer = $('aNoTimer').checked; admin.aim = $('aAim').checked;
+    admin.info = $('aInfo').checked; admin.unlockAll = $('aUnlock').checked;
+    admin.startN = Math.max(0, Math.min(200, Math.floor(Number($('aStart').value) || 0)));
+    admin.timeScale = Number($('aSpeed').value) || 1;
+    $('aSpeedOut').textContent = admin.timeScale.toFixed(2) + '×';
+    store.set('oh_admin', admin);
+    syncAdminUi();
+  }
+  function syncAdminUi() {
+    $('adminBadge').hidden = !adminActive();
+    $('debug').hidden = !admin.info;
+    if (!admin.unlockAll && !trailUnlocked(TRAILS[trailIdx])) { trailIdx = 0; store.set('oh_trail', 0); }
+    renderTrails();
+  }
+  ['aGod', 'aNoTimer', 'aAim', 'aInfo', 'aUnlock', 'aStart', 'aSpeed'].forEach(id => $(id).addEventListener('input', readAdmin));
+  $('aDefaults').addEventListener('click', () => { admin = Object.assign({}, ADMIN_DEFAULTS); store.set('oh_admin', admin); syncAdminUi(); openAdmin(); toast('운영자 설정을 초기화했어요'); });
+  let resetConfirm = false;
+  $('aResetBest').addEventListener('click', () => {
+    if (!resetConfirm) { resetConfirm = true; $('aResetBest').textContent = '한 번 더 누르면 삭제'; return; }
+    best = 0; store.set('oh_best', 0); resetConfirm = false;
+    $('aResetBest').textContent = '최고 기록 삭제';
+    syncBest(); syncAdminUi(); toast('최고 기록을 삭제했어요');
+  });
+  $('aPlay').addEventListener('click', () => { readAdmin(); start(); });
+  $('aClose').addEventListener('click', () => { readAdmin(); show(adminReturn); });
+
+  // hidden entry: tap the title 5 times on the menu
+  let titleTaps = 0, titleT = 0;
+  $('title').addEventListener('click', () => {
+    if (!OPERATOR) return;
+    const now = performance.now();
+    titleTaps = now - titleT < 1500 ? titleTaps + 1 : 1; titleT = now;
+    if (titleTaps >= 5) { titleTaps = 0; openAdmin(); }
+    else if (titleTaps >= 3) toast(`운영자 모드까지 ${5 - titleTaps}번`);
+  });
+
+  // ---------- Loop ----------
+  let last = performance.now(), fps = 60, debugT = 0;
+  function frame(now) {
+    const raw = Math.min(0.033, (now - last) / 1000); last = now;
+    fps += ((raw > 0 ? 1 / raw : 60) - fps) * 0.05;
+    if (state !== 'paused') update(raw * (state === 'play' ? admin.timeScale : 1));
+    draw(now / 1000);
+    if (admin.info && now - debugT > 150) { debugT = now; drawDebug(); }
+    requestAnimationFrame(frame);
+  }
+
+  function update(dt) {
+    if (!planets) return;
+    for (const p of planets) {
+      if (p.vx) { p.x += p.vx * dt; if (p.x < p.minX) { p.x = p.minX; p.vx *= -1; } if (p.x > p.maxX) { p.x = p.maxX; p.vx *= -1; } }
+      p.spin += dt * 0.4; p.pop = Math.max(0, p.pop - dt * 3);
+    }
+    if (state === 'play' || state === 'menu') {
+      if (player.mode === 'orbit') {
+        const p = player.planet;
+        player.r += (p.orbitR - player.r) * Math.min(1, dt * 6);
+        player.ang += player.dir * (p.speed / player.r) * dt;
+        placeOnOrbit();
+        if (state === 'play' && !admin.noTimer) {
+          player.timer += dt;
+          if (player.timer >= p.life) die('시간이 다 됐어요. 링이 사라지기 전에 뛰어야 해요');
+        }
+      } else {
+        player.x += player.vx * dt; player.y += player.vy * dt; player.flyT += dt;
+        for (const p of planets) {
+          if (p.n <= player.planet.n) continue;
+          if (Math.hypot(player.x - p.x, player.y - p.y) < p.orbitR) { capture(p); break; }
+        }
+        if (player.mode === 'fly') {
+          const sy = player.y - cam.y;
+          if (player.x < -30 || player.x > W + 30 || sy < -60 || sy > H + 60 || player.flyT > 2.5) die('궤도를 놓쳤어요. 다음 행성의 점선 안으로 들어가야 해요');
+        }
+      }
+    }
+    // trail
+    trail.push({ x: player.x, y: player.y });
+    if (trail.length > 26) trail.shift();
+    // camera follows the current planet
+    const target = player.planet.y - H * 0.66;
+    cam.y += (target - cam.y) * Math.min(1, dt * 3.2);
+    shake = Math.max(0, shake - dt * 30);
+    cam.shakeX = (Math.random() - 0.5) * shake; cam.shakeY = (Math.random() - 0.5) * shake;
+    flash = Math.max(0, flash - dt);
+    for (const pt of particles) { pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.vx *= 0.96; pt.vy *= 0.96; pt.life -= pt.decay * dt; }
+    particles = particles.filter(p => p.life > 0);
+    for (const f of floaters) { f.y -= 40 * U * dt; f.life -= dt * 0.9; }
+    floaters = floaters.filter(f => f.life > 0);
+  }
+
+  function drawDebug() {
+    const p = player.planet;
+    const lap = (Math.PI * 2 * p.orbitR) / p.speed;
+    $('debug').textContent =
+      `행성     #${p.n}\n` +
+      `궤도     ${(p.orbitR / U).toFixed(1)}\n` +
+      `속도     ${(p.speed / U).toFixed(0)}  (한 바퀴 ${lap.toFixed(2)}s)\n` +
+      `타이머   ${p.life > 50 ? '없음 (시작 행성)' : `${Math.max(0, p.life - player.timer).toFixed(2)} / ${p.life.toFixed(2)}s`}\n` +
+      `좌우이동 ${p.vx ? (Math.abs(p.vx) / U).toFixed(0) : '없음'}\n` +
+      `콤보     ${combo}   배속 ${admin.timeScale}×\n` +
+      `FPS      ${fps.toFixed(0)}`;
+  }
+
+  function draw(t) {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    // sky shifts hue as you climb
+    const h = 265 + Math.sin((passed || 0) * 0.12) * 20;
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, `hsl(${h}, 52%, 11%)`); g.addColorStop(1, `hsl(${h + 25}, 48%, 20%)`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // parallax stars
+    for (const s of stars) {
+      const y = ((s.y - (cam ? cam.y : 0) * s.z * 0.25) % H + H) % H;
+      ctx.globalAlpha = 0.25 + 0.5 * s.z * (0.6 + 0.4 * Math.sin(t * 2 + s.t));
+      ctx.fillStyle = '#f6eefc';
+      ctx.fillRect(s.x, y, s.z * 2, s.z * 2);
+    }
+    ctx.globalAlpha = 1;
+    if (!planets) return;
+    const inRun = state === 'play' || state === 'paused';
+
+    ctx.save();
+    ctx.translate(cam.shakeX, -cam.y + cam.shakeY);
+
+    // planets
+    for (const p of planets) {
+      const cur = p === player.planet;
+      const isNext = p.n === player.planet.n + 1;
+      // orbit ring
+      ctx.lineWidth = 2 * U;
+      ctx.setLineDash(cur ? [] : [6 * U, 8 * U]);
+      ctx.lineDashOffset = -t * 20;
+      ctx.strokeStyle = isNext ? 'rgba(255,179,107,0.75)' : 'rgba(246,238,252,0.22)';
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.orbitR * (1 + p.pop * 0.15), 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      // perfect band hint on next planet
+      if (isNext) {
+        ctx.strokeStyle = 'rgba(255,179,107,0.12)'; ctx.lineWidth = p.orbitR * 0.34;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.orbitR * 0.83, 0, Math.PI * 2); ctx.stroke();
+      }
+      // countdown arc on the current planet
+      if (cur && inRun && player.mode === 'orbit' && p.life < 50 && !admin.noTimer) {
+        const left = Math.max(0, 1 - player.timer / p.life);
+        ctx.strokeStyle = left < 0.3 ? '#ff6f91' : 'rgba(255,179,107,0.9)';
+        ctx.lineWidth = 4 * U; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.orbitR + 9 * U, -Math.PI / 2, -Math.PI / 2 + left * Math.PI * 2); ctx.stroke();
+        ctx.lineCap = 'butt';
+      }
+      // glow + body
+      const R = p.R * (1 + p.pop * 0.25);
+      const gl = ctx.createRadialGradient(p.x, p.y, R * 0.5, p.x, p.y, R * 2.4);
+      gl.addColorStop(0, p.hue[0] + '55'); gl.addColorStop(1, p.hue[0] + '00');
+      ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(p.x, p.y, R * 2.4, 0, Math.PI * 2); ctx.fill();
+      const bg = ctx.createRadialGradient(p.x - R * 0.35, p.y - R * 0.4, R * 0.1, p.x, p.y, R);
+      bg.addColorStop(0, p.hue[0]); bg.addColorStop(1, p.hue[1]);
+      ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI * 2); ctx.fill();
+      // surface bands
+      ctx.save(); ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI * 2); ctx.clip();
+      ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = R * 0.18;
+      for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.ellipse(p.x, p.y + k * R * 0.45, R * 1.2, R * 0.12, Math.sin(p.spin) * 0.2, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.restore();
+      if (p.ring) {
+        ctx.strokeStyle = 'rgba(246,238,252,0.45)'; ctx.lineWidth = 2 * U;
+        ctx.beginPath(); ctx.ellipse(p.x, p.y, R * 1.7, R * 0.45, -0.35, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+
+    // operator aim line
+    if (admin.aim && inRun && player.mode === 'orbit') {
+      const tx = -Math.sin(player.ang) * player.dir, ty = Math.cos(player.ang) * player.dir;
+      ctx.strokeStyle = 'rgba(122,240,200,0.7)'; ctx.lineWidth = 1.5 * U;
+      ctx.setLineDash([4 * U, 6 * U]);
+      ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.lineTo(player.x + tx * H, player.y + ty * H); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // trail
+    const tc = TRAILS[trailIdx].c;
+    if (state !== 'over' || shake > 0) {
+      for (let i = 1; i < trail.length; i++) {
+        const a = i / trail.length;
+        ctx.strokeStyle = i % 2 ? tc[0] : tc[1];
+        ctx.globalAlpha = a * 0.8;
+        ctx.lineWidth = a * 7 * U; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(trail[i - 1].x, trail[i - 1].y); ctx.lineTo(trail[i].x, trail[i].y); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+    // player
+    if (state !== 'over') {
+      const pg = ctx.createRadialGradient(player.x, player.y, 0, player.x, player.y, 18 * U);
+      pg.addColorStop(0, tc[0] + 'cc'); pg.addColorStop(1, tc[0] + '00');
+      ctx.fillStyle = pg; ctx.beginPath(); ctx.arc(player.x, player.y, 18 * U, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(player.x, player.y, 6 * U, 0, Math.PI * 2); ctx.fill();
+    }
+    // particles
+    for (const pt of particles) {
+      ctx.globalAlpha = Math.max(0, pt.life);
+      ctx.fillStyle = pt.c; ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size * pt.life, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // floating text
+    ctx.textAlign = 'center';
+    for (const f of floaters) {
+      ctx.globalAlpha = Math.min(1, f.life * 1.5);
+      ctx.fillStyle = f.color;
+      ctx.font = `${(f.big ? 26 : 20) * U}px "Black Han Sans", sans-serif`;
+      ctx.fillText(f.text, f.x, f.y);
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    if (flash > 0) { ctx.fillStyle = `rgba(255,179,107,${flash * 0.35})`; ctx.fillRect(0, 0, W, H); }
+  }
+
+  // ---------- Wiring ----------
+  window.addEventListener('pointerdown', e => {
+    if (state !== 'play' || e.target.closest('button')) return;
+    e.preventDefault(); tap();
+  }, { passive: false });
+  window.addEventListener('keydown', e => {
+    if (e.target.closest && e.target.closest('input')) return;
+    if (state === 'play' && (e.code === 'Space' || e.code === 'Enter')) { e.preventDefault(); tap(); }
+    else if (e.code === 'Escape') { if (state === 'play') pause(); else if (state === 'paused') resume(); }
+  });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+  $('play').addEventListener('click', start);
+  $('retry').addEventListener('click', start);
+  $('overMenu').addEventListener('click', goMenu);
+  $('howBtn').addEventListener('click', () => { show('how'); $('howClose').focus({ preventScroll: true }); });
+  $('howClose').addEventListener('click', () => show('menu'));
+  $('pause').addEventListener('click', pause);
+  $('resume').addEventListener('click', resume);
+  $('pauseMenu').addEventListener('click', goMenu);
+  function syncMute() { $('mute').textContent = muted ? '무음' : '소리'; $('mute').setAttribute('aria-label', muted ? '소리 켜기' : '소리 끄기'); }
+  $('mute').addEventListener('click', () => { muted = !muted; store.set('oh_muted', muted); syncMute(); audio(); });
+  function syncVibe() { $('vibe').textContent = vibe ? '진동' : '진동 끔'; $('vibe').setAttribute('aria-label', vibe ? '진동 끄기' : '진동 켜기'); $('vibe').setAttribute('aria-pressed', String(vibe)); }
+  $('vibe').addEventListener('click', () => { vibe = !vibe; store.set('oh_vibe', vibe); syncVibe(); haptic('medium'); });
+  window.addEventListener('resize', resize);
+
+  if (!OPERATOR) admin = Object.assign({}, ADMIN_DEFAULTS);
+  resize(); syncMute(); syncVibe(); syncBest(); syncAdminUi();
+  reset(0); // menu shows a live orbit in the background
+  if (OPERATOR && location.hash === '#admin') openAdmin();
+  requestAnimationFrame(frame);
+}
+
+// In the app, copy saved progress from native storage before the game reads it
+(async () => {
+  const prefs = nativePlugin('Preferences');
+  if (prefs) {
+    for (const key of SAVE_KEYS) {
+      try {
+        const { value } = await prefs.get({ key });
+        if (value != null) localStorage.setItem(key, value);
+      } catch {}
+    }
+  }
+  game();
+})();
+</script>
