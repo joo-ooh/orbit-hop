@@ -149,7 +149,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--apricot); o
   transform: translateX(-50%);
   background: var(--panel); border: 1px solid rgba(255, 179, 107, 0.4);
   padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: 14px;
-  white-space: nowrap; pointer-events: none;
+  width: max-content; max-width: calc(100% - 32px); text-align: center; pointer-events: none;
 }
 </style>
 
@@ -177,6 +177,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--apricot); o
     <div class="btns">
       <button class="cta" id="play">게임 시작</button>
       <button class="ghost" id="howBtn">게임 방법</button>
+      <button class="ghost" id="rankMenu" hidden>랭킹</button>
     </div>
     <div class="section-label">꼬리 색상</div>
     <div class="trails" data-trails></div>
@@ -226,6 +227,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--apricot); o
     <div class="hint" data-trail-hint></div>
     <div class="btns">
       <button class="cta" id="retry">다시 도전</button>
+      <button class="ghost" id="rankOver" hidden>랭킹 보기</button>
       <button class="ghost" id="overMenu">메뉴로</button>
     </div>
   </div>
@@ -289,6 +291,8 @@ const nativePlugin = name => {
 // the app build sets OH_CONFIG.operator = false to remove operator mode
 const OPERATOR = !(window.OH_CONFIG && window.OH_CONFIG.operator === false);
 const SAVE_KEYS = ['oh_best', 'oh_trail', 'oh_muted', 'oh_vibe', 'oh_admin'];
+// must match the leaderboard ID created in App Store Connect
+const LEADERBOARD_ID = 'orbithop.best';
 
 function game() {
   const cv = document.getElementById('c');
@@ -373,6 +377,30 @@ function game() {
       return;
     }
     try { navigator.vibrate && navigator.vibrate(VIBRATE_MS[kind]); } catch {}
+  }
+
+  // ---------- Game Center (app only; the web version has no ranking button) ----------
+  const gc = nativePlugin('GameCenter');
+  let gcState = gc ? 'signing-in' : 'none'; // none | signing-in | on | off
+  function gcSignIn() {
+    if (!gc) return Promise.resolve(false);
+    gcState = 'signing-in';
+    return gc.signIn().then(r => {
+      gcState = r && r.signedIn ? 'on' : 'off';
+      if (gcState === 'on') gcSubmit(best); // covers runs played before signing in
+      return gcState === 'on';
+    }).catch(() => { gcState = 'off'; return false; });
+  }
+  function gcSubmit(value) {
+    if (gcState !== 'on' || !(value > 0)) return;
+    gc.submitScore({ leaderboardId: LEADERBOARD_ID, score: value }).catch(() => {});
+  }
+  async function openLeaderboard() {
+    if (gcState !== 'on' && !(await gcSignIn())) {
+      toast('설정 앱에서 Game Center에 로그인하면 랭킹을 볼 수 있어요');
+      return;
+    }
+    gc.showLeaderboard({ leaderboardId: LEADERBOARD_ID }).catch(() => toast('랭킹을 열지 못했어요. 잠시 후 다시 시도해 주세요'));
   }
 
   // ---------- World ----------
@@ -490,6 +518,7 @@ function game() {
     const prevBest = best;
     const isRecord = !cheated && score > best;
     if (isRecord) { best = score; store.set('oh_best', best); }
+    if (!cheated) gcSubmit(score);
     setTimeout(() => showOver(isRecord, reason, prevBest), 650);
   }
 
@@ -679,7 +708,8 @@ function game() {
       `타이머   ${p.life > 50 ? '없음 (시작 행성)' : `${Math.max(0, p.life - player.timer).toFixed(2)} / ${p.life.toFixed(2)}s`}\n` +
       `좌우이동 ${p.vx ? (Math.abs(p.vx) / U).toFixed(0) : '없음'}\n` +
       `콤보     ${combo}   배속 ${admin.timeScale}×\n` +
-      `FPS      ${fps.toFixed(0)}`;
+      `FPS      ${fps.toFixed(0)}\n` +
+      `GameCtr  ${{ none: '없음 (웹)', 'signing-in': '로그인 중', on: '로그인됨', off: '로그인 안 됨' }[gcState]}`;
   }
 
   function draw(t) {
@@ -820,6 +850,10 @@ function game() {
   window.addEventListener('resize', resize);
 
   if (!OPERATOR) admin = Object.assign({}, ADMIN_DEFAULTS);
+  $('rankMenu').hidden = $('rankOver').hidden = !gc;
+  $('rankMenu').addEventListener('click', openLeaderboard);
+  $('rankOver').addEventListener('click', openLeaderboard);
+  gcSignIn();
   resize(); syncMute(); syncVibe(); syncBest(); syncAdminUi();
   reset(0); // menu shows a live orbit in the background
   if (OPERATOR && location.hash === '#admin') openAdmin();

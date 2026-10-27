@@ -36,6 +36,7 @@ App Store Connect의 각 칸에 그대로 붙여 넣을 수 있게 정리했어�
 ■ 이런 게임이에요
 • 규칙은 10초면 익히고, 기록은 계속 갱신하고 싶어지는 게임
 • 올라갈수록 행성은 작아지고, 회전은 빨라지고, 행성이 좌우로 움직이기 시작해요
+• Game Center 랭킹으로 친구와 전 세계 플레이어와 점수 경쟁
 • 점수에 따라 열리는 다섯 가지 꼬리 색상
 • 콤보마다 높아지는 효과음과 손끝에 전해지는 진동
 • 인터넷 연결 없이 플레이할 수 있어요
@@ -57,7 +58,7 @@ App Store Connect의 각 칸에 그대로 붙여 넣을 수 있게 정리했어�
 
 ## 앱 개인정보 보호 (App Privacy)
 
-"데이터를 수집하지 않음"을 선택하세요. 게임은 기록과 설정을 기기 안에만 저장하고, 외부로 아무것도 보내지 않아요. 광고나 분석 SDK를 나중에 넣으면 이 답을 바꿔야 해요.
+"데이터를 수집하지 않음"을 선택하세요. 게임은 기록과 설정을 기기 안에만 저장해요. Game Center 점수는 Apple의 Game Center로 바로 가고, 개발자 서버는 없어요. 제출 화면에서 Apple 안내를 한 번 확인하세요. 광고나 분석 SDK를 나중에 넣으면 이 답을 바꿔야 해요.
 
 ## 스크린샷
 
@@ -91,6 +92,7 @@ HOW TO PLAY
 FEATURES
 • Learn it in seconds, chase your best score for weeks
 • Planets shrink, spin faster and start drifting as you climb
+• Game Center leaderboard to compete with friends and players worldwide
 • Five trail colors to unlock
 • Combo sounds that rise with every PERFECT, plus haptic feedback
 • Plays offline
