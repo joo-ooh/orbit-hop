@@ -24,27 +24,46 @@ jobs:
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
       ORBITHOP_VERSION_CODE: ${{ github.run_number }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
           cache: gradle
 
+      # installs the Android SDK command-line tools and accepts the licenses; Gradle fetches the rest
+      - uses: android-actions/setup-android@v3
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Gradle helper
+        run: |
+          # on failure, post Gradle's error lines as an annotation (visible on the run page without opening logs)
+          cat > "$RUNNER_TEMP/gradle.sh" <<'SH'
+          #!/usr/bin/env bash
+          set -o pipefail
+          cd android
+          if ! ./gradlew --no-daemon "$@" 2>&1 | tee "$RUNNER_TEMP/gradle.log"; then
+            summary=$(grep -E -A12 "What went wrong|error:|^e: |FAILURE" "$RUNNER_TEMP/gradle.log" | head -60 | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
+            echo "::error title=Gradle $*::${summary}"
+            exit 1
+          fi
+          SH
+          chmod +x "$RUNNER_TEMP/gradle.sh"
 
       - name: Test APK (operator mode on)
         run: |
           npm run build:dev
           npx cap sync android
-          cd android && ./gradlew --no-daemon assembleDebug
+          "$RUNNER_TEMP/gradle.sh" assembleDebug
+          cd android
           mv app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/orbit-hop-test.apk"
 
       - name: Prepare upload key
@@ -69,7 +88,8 @@ jobs:
         run: |
           npm run build
           npx cap sync android
-          cd android && ./gradlew --no-daemon bundleRelease
+          "$RUNNER_TEMP/gradle.sh" bundleRelease
+          cd android
           mv app/build/outputs/bundle/release/app-release.aab "$RUNNER_TEMP/orbit-hop-${{ github.run_number }}.aab"
 
       - uses: actions/upload-artifact@v4
