@@ -1,4 +1,4 @@
-"""Draws the app icon (1024x1024) and launch image (2732x2732) and copies them into the Xcode project.
+"""Draws the app icon, launch images and store graphics, and copies them into the Xcode and Android projects.
 
 Run from the project root:  python3 scripts/make_art.py
 """
@@ -63,7 +63,7 @@ def draw_motif(canvas, cx, cy, s):
 
     d = ImageDraw.Draw(canvas)
     w = max(2, round(s * 0.05))
-    d.ellipse([cx - orbit, cy - orbit, cx + orbit, cy + orbit], outline=INK + (90,), width=w)
+    d.ellipse([cx - orbit, cy - orbit, cx + orbit, cy + orbit], outline=INK + (255,), width=w)
 
     ball = sphere(round(s * 2), *PLANET)
     canvas.alpha_composite(ball, (round(cx - s), round(cy - s)))
@@ -115,14 +115,83 @@ def stars(canvas, count, seed, max_r):
 def make_icon(path):
     ss = 4  # supersample for smooth edges
     size = 1024 * ss
+    canvas = icon_background(size)
+    canvas.alpha_composite(icon_foreground(size))
+    canvas.convert("RGB").resize((1024, 1024), Image.LANCZOS).save(path)  # App Store icons must have no alpha
+
+
+def icon_background(size):
     canvas = vertical_gradient(size, VOID_2, VOID).convert("RGBA")
-    stars(canvas, 70, 7, 5 * ss)
-    # a small next planet, top left
+    stars(canvas, 70, 7, size * 5 / 1024)
+    return canvas
+
+
+def icon_foreground(size):
+    """The small next planet and the orbit motif on a transparent layer."""
+    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     sx, sy, sr = size * 0.24, size * 0.22, size * 0.075
     glow(canvas, sx, sy, sr * 1.8, PLANET_2[0], 80)
     canvas.alpha_composite(sphere(round(sr * 2), *PLANET_2), (round(sx - sr), round(sy - sr)))
     draw_motif(canvas, size * 0.55, size * 0.6, size * 0.2)
-    canvas.convert("RGB").resize((1024, 1024), Image.LANCZOS).save(path)  # App Store icons must have no alpha
+    return canvas
+
+
+ANDROID_RES = ROOT / "android/app/src/main/res"
+DENSITIES = {"mdpi": 1, "hdpi": 1.5, "xhdpi": 2, "xxhdpi": 3, "xxxhdpi": 4}
+
+
+def make_android(res):
+    """Launcher icons (legacy, round, adaptive layers) and pre-Android-12 launch images."""
+    big = 2048
+    bg = icon_background(big)
+    fg = icon_foreground(big)
+    full = bg.copy()
+    full.alpha_composite(fg)
+    # adaptive foreground: the artwork shrunk into the 66dp safe circle of the 108dp layer
+    safe = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    inner = round(big * 0.62)
+    safe.alpha_composite(fg.resize((inner, inner), Image.LANCZOS), ((big - inner) // 2, (big - inner) // 2))
+    for name, scale in DENSITIES.items():
+        folder = res / f"mipmap-{name}"
+        folder.mkdir(exist_ok=True)
+        icon, layer = round(48 * scale), round(108 * scale)
+        full.convert("RGB").resize((icon, icon), Image.LANCZOS).save(folder / "ic_launcher.png")
+        round_icon = full.resize((icon, icon), Image.LANCZOS)
+        mask = Image.new("L", (icon * 4, icon * 4), 0)
+        ImageDraw.Draw(mask).ellipse([0, 0, icon * 4 - 1, icon * 4 - 1], fill=255)
+        round_icon.putalpha(mask.resize((icon, icon), Image.LANCZOS))
+        round_icon.save(folder / "ic_launcher_round.png")
+        bg.convert("RGB").resize((layer, layer), Image.LANCZOS).save(folder / "ic_launcher_background.png")
+        safe.resize((layer, layer), Image.LANCZOS).save(folder / "ic_launcher_foreground.png")
+    # launch images for Android 11 and older: crop the square splash to each screen shape
+    splash = Image.open(RES / "splash.png")
+    for path in res.glob("drawable*/splash.png"):
+        w, h = Image.open(path).size
+        side = max(w, h)
+        img = splash.resize((side, side), Image.LANCZOS)
+        img.crop(((side - w) // 2, (side - h) // 2, (side - w) // 2 + w, (side - h) // 2 + h)).save(path)
+
+
+def make_play_assets(folder):
+    """Google Play listing graphics: 512x512 icon and 1024x500 feature graphic."""
+    folder.mkdir(parents=True, exist_ok=True)
+    Image.open(RES / "icon.png").resize((512, 512), Image.LANCZOS).save(folder / "play-icon-512.png")
+
+    ss = 2
+    w, h = 1024 * ss, 500 * ss
+    canvas = Image.new("RGB", (w, h))
+    d = ImageDraw.Draw(canvas)
+    for x in range(w):
+        d.line([(x, 0), (x, h)], fill=lerp(VOID, VOID_2, x / (w - 1)))
+    canvas = canvas.convert("RGBA")
+    stars(canvas, 120, 5, 3 * ss)
+    draw_motif(canvas, w * 0.76, h * 0.52, h * 0.2)
+    d = ImageDraw.Draw(canvas)
+    title = ImageFont.truetype(str(RES / "fonts/BlackHanSans-Regular.ttf"), 128 * ss)
+    sub = ImageFont.truetype(str(RES / "fonts/GothicA1-Bold.ttf"), 34 * ss)
+    d.text((80 * ss, 215 * ss), "궤도점프", font=title, fill=INK, anchor="ls")
+    d.text((84 * ss, 290 * ss), "탭 한 번으로 우주를 건너요", font=sub, fill=APRICOT, anchor="ls")
+    canvas.convert("RGB").resize((1024, 500), Image.LANCZOS).save(folder / "feature-graphic-1024x500.png")
 
 
 def make_splash(path):
@@ -145,4 +214,8 @@ if __name__ == "__main__":
         for name in ("splash-2732x2732.png", "splash-2732x2732-1.png", "splash-2732x2732-2.png"):
             shutil.copy(RES / "splash.png", IOS_ASSETS / "Splash.imageset" / name)
         print("icon and splash copied into the Xcode project")
-    print("wrote resources/icon.png and resources/splash.png")
+    if ANDROID_RES.exists():
+        make_android(ANDROID_RES)
+        print("launcher icons and launch images written into the Android project")
+    make_play_assets(ROOT / "store/play")
+    print("wrote resources/icon.png, resources/splash.png and store/play/ graphics")

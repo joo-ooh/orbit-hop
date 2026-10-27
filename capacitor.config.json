@@ -8,5 +8,17 @@
     "backgroundColor": "#170f2e",
     "scrollEnabled": false,
     "allowsLinkPreview": false
+  },
+  "android": {
+    "backgroundColor": "#170f2e",
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SystemBars": {
+      "hidden": true,
+      "style": "DARK",
+      "insetsHandling": "css",
+      "initialViewportFitValueHint": "cover"
+    }
   }
 }

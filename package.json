@@ -9,11 +9,15 @@
     "build:dev": "node scripts/build.mjs --dev",
     "ios": "npm run build && npx cap sync ios && npx cap open ios",
     "ios:dev": "npm run build:dev && npx cap sync ios && npx cap open ios",
+    "android": "npm run build && npx cap sync android && npx cap open android",
+    "android:dev": "npm run build:dev && npx cap sync android && npx cap open android",
     "art": "python3 scripts/make_art.py",
     "store-shots": "node scripts/screenshots.mjs && python3 scripts/frame_screenshots.py",
     "shorts": "node scripts/shorts.mjs --seed 5 && python3 scripts/make_shorts_audio.py"
   },
   "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
     "@capacitor/core": "8.5.3",
     "@capacitor/haptics": "8.0.2",
     "@capacitor/ios": "8.5.3",

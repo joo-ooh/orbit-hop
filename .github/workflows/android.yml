@@ -1,0 +1,84 @@
+# Builds the Android app on every push to main (or by hand from the Actions tab).
+#
+# Outputs, under the run's "Artifacts":
+#   orbit-hop-test-apk      test build (operator mode ON), install it on your phone to play
+#   orbit-hop-release-aab   store build (operator mode OFF) for Google Play, only when the upload key secrets are set
+#
+# Upload key secrets (Settings > Secrets and variables > Actions), see RELEASE-ANDROID.md:
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+name: Android build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+      ORBITHOP_VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test APK (operator mode on)
+        run: |
+          npm run build:dev
+          npx cap sync android
+          cd android && ./gradlew --no-daemon assembleDebug
+          mv app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/orbit-hop-test.apk"
+
+      - name: Prepare upload key
+        id: key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            echo "path=$RUNNER_TEMP/upload.jks" >> "$GITHUB_OUTPUT"
+          else
+            echo "No upload key secrets yet: skipping the Google Play bundle."
+          fi
+
+      - name: Store bundle for Google Play (operator mode off)
+        if: steps.key.outputs.path != ''
+        env:
+          ORBITHOP_KEYSTORE: ${{ steps.key.outputs.path }}
+          ORBITHOP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ORBITHOP_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ORBITHOP_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          npm run build
+          npx cap sync android
+          cd android && ./gradlew --no-daemon bundleRelease
+          mv app/build/outputs/bundle/release/app-release.aab "$RUNNER_TEMP/orbit-hop-${{ github.run_number }}.aab"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orbit-hop-test-apk
+          path: ${{ runner.temp }}/orbit-hop-test.apk
+
+      - uses: actions/upload-artifact@v4
+        if: steps.key.outputs.path != ''
+        with:
+          name: orbit-hop-release-aab
+          path: ${{ runner.temp }}/orbit-hop-*.aab

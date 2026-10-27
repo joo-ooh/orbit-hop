@@ -294,6 +294,7 @@ const nativePlugin = name => {
 };
 // the app build sets OH_CONFIG.operator = false to remove operator mode
 const OPERATOR = !(window.OH_CONFIG && window.OH_CONFIG.operator === false);
+const PLATFORM = (window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform()) || 'web';
 const SAVE_KEYS = ['oh_best', 'oh_trail', 'oh_muted', 'oh_vibe', 'oh_admin'];
 // must match the leaderboard ID created in App Store Connect
 const LEADERBOARD_ID = 'orbithop.best';
@@ -387,7 +388,7 @@ function game() {
   }
 
   // ---------- Game Center (app only; the web version has no ranking button) ----------
-  const gc = nativePlugin('GameCenter');
+  const gc = PLATFORM === 'ios' ? nativePlugin('GameCenter') : null;
   let gcState = gc ? 'signing-in' : 'none'; // none | signing-in | on | off
   function gcSignIn() {
     if (!gc) return Promise.resolve(false);
@@ -877,6 +878,16 @@ function game() {
     else if (e.code === 'Escape') { if (state === 'play') pause(); else if (state === 'paused') resume(); }
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+  // Android back button: pause the run or close the open panel; on the main menu, leave the app
+  const appPlugin = PLATFORM === 'android' ? nativePlugin('App') : null;
+  if (appPlugin) appPlugin.addListener('backButton', () => {
+    if (!$('how').hidden) show('menu');
+    else if (!$('admin').hidden) $('aClose').click();
+    else if (state === 'play') pause();
+    else if (state === 'paused') resume();
+    else if (state === 'over') goMenu();
+    else appPlugin.exitApp();
+  });
   $('play').addEventListener('click', start);
   $('retry').addEventListener('click', start);
   $('overMenu').addEventListener('click', goMenu);
