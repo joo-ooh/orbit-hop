@@ -4,9 +4,10 @@
 
 ## 0. 준비물
 
-- **Mac**과 **Xcode** (App Store에서 무료 설치). iOS 앱 빌드와 업로드는 Mac에서만 할 수 있어요.
+- **Mac**(MacBook 포함)과 **Xcode 26 이상** (Mac App Store에서 무료 설치). Xcode 26은 macOS Sequoia 15.6 이상에서 돌아가요. 2026년 4월부터 App Store 업로드에는 Xcode 26 빌드가 필수예요.
 - **Apple Developer Program** 가입 (연 $99, 한국 129,000원). https://developer.apple.com/programs/ 에서 가입하고, 승인까지 보통 하루에서 이틀 걸려요.
-- Node.js 20 이상 (https://nodejs.org)
+- Node.js 22 (https://nodejs.org 에서 LTS 설치)
+- Git (터미널에서 `git --version`을 처음 실행하면 설치 안내가 떠요)
 
 ## 1. 본인 정보로 바꾸기
 
@@ -33,6 +34,12 @@ npm run ios        # 스토어용으로 빌드하고 Xcode를 엽니다
 **Signing & Capabilities** 탭에 **Game Center**가 보이는지 확인하세요. 서명에서 오류가 나면 **+ Capability**로 Game Center를 한 번 다시 추가하면 됩니다.
 
 ## 4. 내 iPhone에서 먼저 해보기
+
+처음 한 번만 iPhone 준비가 필요해요.
+- iPhone **설정 > 개인정보 보호 및 보안 > 개발자 모드**를 켜고 재시동하세요. 이 메뉴는 케이블로 Mac에 한 번 연결한 뒤에 나타나요.
+- 처음 설치한 앱이 열리지 않으면 **설정 > 일반 > VPN 및 기기 관리**에서 본인 개발자 인증서를 신뢰하세요.
+
+**개발자 계정 승인 전 무료 Apple ID로 테스트할 때:** Xcode의 Team에 개인 Apple ID(Personal Team)를 고르면 돼요. 단, 무료 계정은 Game Center를 지원하지 않아서 서명 오류가 나요. **Signing & Capabilities**에서 Game Center 옆의 ✕를 눌러 잠시 빼고 테스트하세요. 이 변경은 GitHub에 올리지 말고, 유료 계정이 승인되면 **+ Capability > Game Center**로 다시 추가하세요. 무료 계정으로 설치한 앱은 7일 뒤 다시 설치해야 해요.
 
 iPhone을 케이블로 연결하고 Xcode 위쪽에서 기기를 고른 뒤 ▶ 버튼을 누르세요. 진동은 시뮬레이터가 아닌 실제 기기에서만 느낄 수 있어요.
 
