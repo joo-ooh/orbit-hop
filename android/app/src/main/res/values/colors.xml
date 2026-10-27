@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- the game's background (--void in src/game.html) -->
+    <!-- the game background color, same as "void" in src/game.html -->
     <color name="orbit_space">#170F2E</color>
 </resources>
