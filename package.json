@@ -10,7 +10,8 @@
     "ios": "npm run build && npx cap sync ios && npx cap open ios",
     "ios:dev": "npm run build:dev && npx cap sync ios && npx cap open ios",
     "art": "python3 scripts/make_art.py",
-    "store-shots": "node scripts/screenshots.mjs && python3 scripts/frame_screenshots.py"
+    "store-shots": "node scripts/screenshots.mjs && python3 scripts/frame_screenshots.py",
+    "shorts": "node scripts/shorts.mjs --seed 5 && python3 scripts/make_shorts_audio.py"
   },
   "dependencies": {
     "@capacitor/core": "8.5.3",

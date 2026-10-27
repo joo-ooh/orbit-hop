@@ -17,6 +17,7 @@
 | `npm run ios:dev` | 테스트용 빌드 후 Xcode 열기 (운영자 모드 켜짐, 업로드 금지) |
 | `npm run art` | 아이콘과 런치 화면 다시 그리기 (Python, Pillow 필요) |
 | `npm run store-shots` | 스토어 스크린샷 다시 촬영하고 문구 프레임 씌우기 |
+| `npm run shorts` | 쇼츠용 세로 플레이 영상(`store/video/orbit-hop-shorts.mp4`) 다시 만들기 (ffmpeg, numpy 필요) |
 
 ## 폴더 구성
 

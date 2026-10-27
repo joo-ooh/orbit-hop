@@ -255,6 +255,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--apricot); o
       <input type="checkbox" id="aInfo">
     </div>
     <div class="row">
+      <label for="aAuto">자동 플레이<small>PERFECT를 노려 스스로 점프해요 (난이도 확인, 영상 촬영용)</small></label>
+      <input type="checkbox" id="aAuto">
+    </div>
+    <div class="row">
       <label for="aStart">시작 행성<small>후반 난이도를 바로 테스트해요 (0 = 처음)</small></label>
       <input type="number" id="aStart" min="0" max="200" step="1" inputmode="numeric" value="0">
     </div>
@@ -319,11 +323,12 @@ function game() {
   const PLANET_HUES = [['#ff9f7a', '#c2456b'], ['#8fd3ff', '#3b5bd6'], ['#b6f28a', '#2f9e78'], ['#ffd36e', '#e0723a'], ['#e3a6ff', '#7646c9'], ['#ff8fb6', '#b23a7a']];
 
   // Operator settings
-  const ADMIN_DEFAULTS = { god: false, noTimer: false, aim: false, info: false, startN: 0, timeScale: 1, unlockAll: false };
+  // autoplayStopAt (no UI, set by the video capture script): from that planet on, autoplay misses on purpose
+  const ADMIN_DEFAULTS = { god: false, noTimer: false, aim: false, info: false, autoplay: false, autoplayStopAt: 0, startN: 0, timeScale: 1, unlockAll: false };
   let admin = Object.assign({}, ADMIN_DEFAULTS, store.get('oh_admin', {}));
-  const adminActive = () => admin.god || admin.noTimer || admin.aim || admin.info || admin.startN > 0 || admin.timeScale !== 1 || admin.unlockAll;
+  const adminActive = () => admin.god || admin.noTimer || admin.aim || admin.info || admin.autoplay || admin.startN > 0 || admin.timeScale !== 1 || admin.unlockAll;
   // settings that make a run unfair for the leaderboard
-  const runIsCheated = () => admin.god || admin.noTimer || admin.aim || admin.startN > 0 || admin.timeScale !== 1;
+  const runIsCheated = () => admin.god || admin.noTimer || admin.aim || admin.autoplay || admin.startN > 0 || admin.timeScale !== 1;
 
   let W = 0, H = 0, DPR = 1, U = 1;
   let best = store.get('oh_best', 0);
@@ -351,6 +356,8 @@ function game() {
     return ac;
   }
   function tone(freq, dur, type = 'sine', vol = 0.18, slide = 0) {
+    // the video capture script sets this to rebuild the soundtrack offline
+    if (window.__ohToneLog) window.__ohToneLog.push([performance.now(), freq, dur, type, vol, slide]);
     if (muted || !ac) return;
     const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
     o.type = type; o.frequency.setValueAtTime(freq, t);
@@ -522,6 +529,40 @@ function game() {
     setTimeout(() => showOver(isRecord, reason, prevBest), 650);
   }
 
+  // ---------- Operator autoplay ----------
+  // Launches when the straight path would cross the next orbit at the chosen depth
+  // (in orbit radii from the center): mostly PERFECT grazes, sometimes plain landings.
+  let autoPrevB = null, autoGoal = null, autoGoalFor = -1;
+  function autopilot() {
+    const p = player.planet;
+    const next = planets.find(q => q.n === p.n + 1);
+    if (!next) return;
+    if (autoGoalFor !== p.n) {
+      autoGoalFor = p.n; autoPrevB = null;
+      const stop = admin.autoplayStopAt > 0 && p.n >= admin.autoplayStopAt;
+      autoGoal = stop ? [1.25, 1.6] : Math.random() < 0.2 ? [0.25, 0.5] : [0.72, 0.9];
+    }
+    if (player.timer < 0.35) { autoPrevB = null; return; }
+    const fs = U * 640;
+    // velocity relative to the (possibly drifting) next planet
+    const vx = -Math.sin(player.ang) * player.dir * fs + p.vx - next.vx;
+    const vy = Math.cos(player.ang) * player.dir * fs;
+    const qx = next.x - player.x, qy = next.y - player.y;
+    if (qx * vx + qy * vy <= 0) { autoPrevB = null; return; }
+    const b = (qx * vy - qy * vx) / Math.hypot(vx, vy) / next.orbitR;
+    const [lo, hi] = autoGoal;
+    const inBand = x => Math.abs(x) >= lo && Math.abs(x) <= hi;
+    let go = inBand(b);
+    if (!go && autoPrevB !== null && Math.abs(b - autoPrevB) < 1) {
+      // the band was crossed between frames: still go if this spot lands (or misses, when missing on purpose)
+      const a = Math.min(autoPrevB, b), c = Math.max(autoPrevB, b);
+      const crossed = (a <= hi && c >= lo) || (a <= -lo && c >= -hi);
+      go = crossed && (lo > 1 ? Math.abs(b) > 1.05 : Math.abs(b) < 0.97);
+    }
+    autoPrevB = b;
+    if (go) { autoPrevB = null; tap(); }
+  }
+
   // ---------- Screens ----------
   const SCREENS = ['menu', 'how', 'paused', 'over', 'admin'];
   function show(id) { SCREENS.forEach(s => { $(s).hidden = s !== id; }); }
@@ -601,7 +642,7 @@ function game() {
   function openAdmin() {
     adminReturn = state === 'over' ? 'over' : 'menu';
     $('aGod').checked = admin.god; $('aNoTimer').checked = admin.noTimer; $('aAim').checked = admin.aim;
-    $('aInfo').checked = admin.info; $('aStart').value = admin.startN; $('aSpeed').value = admin.timeScale;
+    $('aInfo').checked = admin.info; $('aAuto').checked = admin.autoplay; $('aStart').value = admin.startN; $('aSpeed').value = admin.timeScale;
     $('aUnlock').checked = admin.unlockAll;
     $('aSpeedOut').textContent = admin.timeScale.toFixed(2) + '×';
     resetConfirm = false; $('aResetBest').textContent = '최고 기록 삭제';
@@ -609,7 +650,7 @@ function game() {
   }
   function readAdmin() {
     admin.god = $('aGod').checked; admin.noTimer = $('aNoTimer').checked; admin.aim = $('aAim').checked;
-    admin.info = $('aInfo').checked; admin.unlockAll = $('aUnlock').checked;
+    admin.info = $('aInfo').checked; admin.autoplay = $('aAuto').checked; admin.unlockAll = $('aUnlock').checked;
     admin.startN = Math.max(0, Math.min(200, Math.floor(Number($('aStart').value) || 0)));
     admin.timeScale = Number($('aSpeed').value) || 1;
     $('aSpeedOut').textContent = admin.timeScale.toFixed(2) + '×';
@@ -622,7 +663,7 @@ function game() {
     if (!admin.unlockAll && !trailUnlocked(TRAILS[trailIdx])) { trailIdx = 0; store.set('oh_trail', 0); }
     renderTrails();
   }
-  ['aGod', 'aNoTimer', 'aAim', 'aInfo', 'aUnlock', 'aStart', 'aSpeed'].forEach(id => $(id).addEventListener('input', readAdmin));
+  ['aGod', 'aNoTimer', 'aAim', 'aInfo', 'aAuto', 'aUnlock', 'aStart', 'aSpeed'].forEach(id => $(id).addEventListener('input', readAdmin));
   $('aDefaults').addEventListener('click', () => { admin = Object.assign({}, ADMIN_DEFAULTS); store.set('oh_admin', admin); syncAdminUi(); openAdmin(); toast('운영자 설정을 초기화했어요'); });
   let resetConfirm = false;
   $('aResetBest').addEventListener('click', () => {
@@ -671,6 +712,7 @@ function game() {
           player.timer += dt;
           if (player.timer >= p.life) die('시간이 다 됐어요. 링이 사라지기 전에 뛰어야 해요');
         }
+        if (state === 'play' && admin.autoplay && player.mode === 'orbit') autopilot();
       } else {
         player.x += player.vx * dt; player.y += player.vy * dt; player.flyT += dt;
         for (const p of planets) {
