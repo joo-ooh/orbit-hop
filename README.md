@@ -6,7 +6,9 @@
 
 ## 바로 해보기
 
-`src/game.html`을 브라우저로 열면 웹 버전이 실행돼요. 메뉴에서 제목을 빠르게 5번 탭하면 운영자 모드가 열립니다.
+**https://joo-ooh.github.io/orbit-hop/** 에서 누구나 바로 플레이할 수 있어요 (출시용 버전, 운영자 모드 없음).
+
+개발 중에는 `src/game.html`을 브라우저로 열면 돼요. 메뉴에서 제목을 빠르게 5번 탭하면 운영자 모드가 열립니다.
 
 ## 명령어
 
@@ -17,6 +19,7 @@
 | `npm run ios:dev` | 테스트용 빌드 후 Xcode 열기 (운영자 모드 켜짐, 업로드 금지) |
 | `npm run android` | 스토어용 빌드 후 Android Studio 열기 (GitHub Actions가 자동으로 빌드하므로 선택 사항) |
 | `npm run android:dev` | 테스트용 빌드 후 Android Studio 열기 |
+| `npm run pages` | 웹 플레이 페이지(`index.html`)를 게임 최신 버전으로 다시 만들기. 게임을 고친 뒤 실행해서 같이 커밋 |
 | `npm run art` | 아이콘과 런치 화면 다시 그리기 (Python, Pillow 필요) |
 | `npm run store-shots` | 스토어 스크린샷 다시 촬영하고 문구 프레임 씌우기 |
 | `npm run shorts` | 쇼츠용 세로 플레이 영상(`store/video/orbit-hop-shorts.mp4`) 다시 만들기 (ffmpeg, numpy 필요) |
@@ -31,6 +34,7 @@
 | `android/` | Android Studio 프로젝트 |
 | `.github/workflows/android.yml` | `main`에 올릴 때마다 Android 앱을 빌드하는 GitHub Actions |
 | `resources/` | 아이콘, 런치 화면, 내장 폰트 (SIL OFL) |
-| `store/` | App Store와 Google Play 문구, 그래픽, 스크린샷, 개인정보처리방침, 쇼츠 영상 |
+| `store/` | App Store와 Google Play 문구, 그래픽, 스크린샷, 쇼츠 영상 |
+| `index.html`, `privacy/`, `support/` | GitHub Pages 사이트: 웹 플레이, 개인정보처리방침, 고객 지원 |
 
 출시 절차: iOS는 [RELEASE.md](RELEASE.md), Android는 [RELEASE-ANDROID.md](RELEASE-ANDROID.md).

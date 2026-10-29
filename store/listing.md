@@ -52,9 +52,9 @@ App Store Connect의 각 칸에 그대로 붙여 넣을 수 있게 정리했어�
 
 | 항목 | 값 |
 |---|---|
-| 지원 URL (필수) | 본인 연락처가 있는 페이지. GitHub Pages나 Notion 공개 페이지도 됩니다 |
-| 개인정보처리방침 URL (필수) | `store/privacy-policy.html`을 공개 주소에 올린 뒤 그 주소 |
-| 마케팅 URL | 선택 |
+| 지원 URL (필수) | https://joo-ooh.github.io/orbit-hop/support/ |
+| 개인정보처리방침 URL (필수) | https://joo-ooh.github.io/orbit-hop/privacy/ |
+| 마케팅 URL (선택) | https://joo-ooh.github.io/orbit-hop/ (웹에서 바로 플레이) |
 
 ## 앱 개인정보 보호 (App Privacy)
 

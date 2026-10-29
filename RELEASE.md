@@ -13,7 +13,7 @@
 
 1. `capacitor.config.json`의 `appId`를 본인 것으로 바꾸세요. 예: `com.hongildong.orbithop`. 전 세계에서 유일해야 하고, 출시 후에는 바꿀 수 없어요.
 2. 같은 값을 Xcode에서도 설정합니다 (3단계에서 안내).
-3. `store/privacy-policy.html`의 `[연락받을 이메일 주소]` 두 곳을 채우세요.
+3. 개인정보처리방침(https://joo-ooh.github.io/orbit-hop/privacy/)과 지원 페이지(https://joo-ooh.github.io/orbit-hop/support/)는 GitHub Pages에 올라가 있어요. 문의 이메일을 바꾸려면 `privacy/index.html`과 `support/index.html`을 고치세요.
 
 ## 2. Mac에서 프로젝트 열기
 
@@ -85,7 +85,8 @@ https://appstoreconnect.apple.com > **앱** > **+** > **신규 앱**
 `store/listing.md`의 값을 각 칸에 붙여 넣으세요.
 
 - 스크린샷: `store/screenshots/`의 PNG 네 장 (iPhone 6.9")
-- 개인정보처리방침 URL: `privacy-policy.html`을 공개 주소에 올려야 해요. GitHub Pages가 가장 간단해요.
+- 개인정보처리방침 URL: https://joo-ooh.github.io/orbit-hop/privacy/
+- 지원 URL: https://joo-ooh.github.io/orbit-hop/support/
 - 앱 개인정보 보호: "데이터를 수집하지 않음"
 - 빌드: 6단계에서 올린 빌드 선택
 - Game Center: 켜고 `orbithop.best` 리더보드 추가 (5-1단계)

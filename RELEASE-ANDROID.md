@@ -13,7 +13,7 @@ Android 앱은 **GitHub가 대신 빌드**해요. `main`에 올릴 때마다 Git
 ## 0. 준비물
 
 - **Google Play 개발자 계정** (1회 $25): https://play.google.com/console/signup. 신원 확인에 며칠 걸릴 수 있어요.
-- iOS와 같은 개인정보처리방침 공개 주소
+- 개인정보처리방침 주소: https://joo-ooh.github.io/orbit-hop/privacy/
 
 ## 1. 꼭 알아둘 것: 14일 비공개 테스트
 
