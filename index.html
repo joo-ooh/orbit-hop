@@ -373,14 +373,20 @@ function game() {
   let stars = [];
   const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Every 10 planets the sky moves into a new zone: new colors, a short name banner and a new key for the music
+  // Every 10 planets the sky moves into a new zone: new colors, a short name banner and a new key for the music.
+  // Colors stay easy on the eyes on a screen you stare at: saturation 50% or less (reds and oranges 35% or less)
+  // and lightness 20% or less. After zone 10 the cycle starts again.
   const ZONES = [
-    { name: '궤도 입문', top: [265, 52, 11], bot: [290, 48, 20], key: 0 },
-    { name: '청록 성운', top: [200, 55, 10], bot: [178, 45, 17], key: 2 },
-    { name: '붉은 성단', top: [340, 50, 11], bot: [12, 45, 18], key: -3 },
-    { name: '심해 은하', top: [228, 60, 9], bot: [250, 50, 18], key: 5 },
-    { name: '황금 고리', top: [30, 45, 10], bot: [322, 40, 18], key: -2 },
-    { name: '오로라 띠', top: [160, 50, 9], bot: [275, 45, 18], key: 3 },
+    { name: '궤도 입문', top: [265, 50, 11], bot: [290, 46, 20], key: 0 },
+    { name: '청록 성운', top: [200, 50, 10], bot: [178, 42, 17], key: 2 },
+    { name: '노을 성단', top: [330, 28, 10], bot: [15, 30, 16], key: -3 },
+    { name: '심해 은하', top: [228, 50, 9], bot: [250, 45, 18], key: 5 },
+    { name: '황금 고리', top: [35, 35, 9], bot: [320, 25, 16], key: -2 },
+    { name: '오로라 띠', top: [160, 45, 9], bot: [275, 42, 18], key: 3 },
+    { name: '얼음 행성대', top: [205, 32, 12], bot: [222, 28, 20], key: 1 },
+    { name: '숲빛 성운', top: [140, 32, 8], bot: [172, 30, 15], key: -4 },
+    { name: '자수정 협곡', top: [285, 40, 10], bot: [312, 32, 17], key: 4 },
+    { name: '은하 중심', top: [240, 30, 7], bot: [258, 34, 14], key: -1 },
   ];
   const zoneOf = n => Math.floor(n / 10);
   const zoneInfo = z => ZONES[z % ZONES.length];
@@ -923,7 +929,8 @@ function game() {
       const nx = fx * W + Math.sin(t * 0.07 + fy * 5) * 30 * U;
       const [h, s, l] = sky[k];
       const neb = ctx.createRadialGradient(nx, ny, 0, nx, ny, fr * Math.max(W, H));
-      neb.addColorStop(0, hsl([h + 35, s + 10, l + 14], 0.32)); neb.addColorStop(1, hsl([h + 35, s, l], 0));
+      // the clouds follow the same comfort limit as the sky
+      neb.addColorStop(0, hsl([h + 35, Math.min(45, s + 10), l + 12], 0.3)); neb.addColorStop(1, hsl([h + 35, s, l], 0));
       ctx.fillStyle = neb; ctx.fillRect(0, 0, W, H);
     }
     // parallax stars
