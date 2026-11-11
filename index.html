@@ -55,8 +55,9 @@ body {
 #stage { position: fixed; inset: 0; }
 canvas { display: block; width: 100%; height: 100%; }
 
+/* layers: game canvas < menu / game over < top bar < pop-up panels (pause, settings, how to play, operator) */
 .hud {
-  position: fixed; left: 0; right: 0; top: 0;
+  position: fixed; left: 0; right: 0; top: 0; z-index: 5;
   padding-top: calc(env(safe-area-inset-top, 0px) + 14px);
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -79,6 +80,22 @@ canvas { display: block; width: 100%; height: 100%; }
 .best { font-size: 13px; color: var(--muted); letter-spacing: 0.06em; margin-top: 6px; font-variant-numeric: tabular-nums; }
 .best .sep { opacity: 0.5; margin: 0 6px; }
 @media (prefers-reduced-motion: reduce) { .score.bump, .score.bump-big { animation: none; } }
+body.calm .score.bump, body.calm .score.bump-big { animation: none; }
+
+/* settings switches in the pause / settings panel */
+.settings { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.setting {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%;
+  padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line);
+  background: rgba(246, 238, 252, 0.05); color: var(--ink); font: inherit; text-align: left; cursor: pointer;
+}
+.setting span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.setting b { font-size: 15px; }
+.setting small { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.setting i { flex: none; position: relative; width: 46px; height: 28px; border-radius: 14px; background: rgba(246, 238, 252, 0.18); transition: background 0.2s; }
+.setting i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); transition: transform 0.2s; }
+.setting[aria-checked="true"] i { background: var(--mint); }
+.setting[aria-checked="true"] i::after { transform: translateX(18px); }
 .badge { display: inline-block; margin-top: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--void); background: var(--mint); border-radius: 999px; padding: 3px 9px; }
 .icon-btn {
   pointer-events: auto;
@@ -98,7 +115,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--apricot); o
   padding-block: calc(env(safe-area-inset-top, 0px) + 24px) calc(env(safe-area-inset-bottom, 0px) + 24px);
   overflow-y: auto;
 }
-.screen.dim { background: rgba(23, 15, 46, 0.55); }
+.screen.dim { background: rgba(23, 15, 46, 0.55); z-index: 10; }
 #menu { background: radial-gradient(ellipse at 50% 45%, rgba(23, 15, 46, 0.82) 0%, rgba(23, 15, 46, 0.55) 60%, rgba(23, 15, 46, 0.25) 100%); }
 .eyebrow { font-size: 12px; letter-spacing: 0.32em; color: var(--apricot); text-transform: uppercase; font-weight: 700; }
 .title {
@@ -177,7 +194,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--apricot); o
   transform: translateX(-50%);
   background: var(--panel); border: 1px solid rgba(255, 179, 107, 0.4);
   padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: 14px;
-  width: max-content; max-width: calc(100% - 32px); text-align: center; pointer-events: none;
+  width: max-content; max-width: calc(100% - 32px); text-align: center; pointer-events: none; z-index: 30;
 }
 </style>
 </head>
@@ -192,8 +209,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--apricot); o
   </div>
   <div class="hud-right">
     <button class="icon-btn" id="pause" aria-label="일시정지" hidden>II</button>
-    <button class="icon-btn" id="mute" aria-label="소리 끄기">소리</button>
-    <button class="icon-btn" id="vibe" aria-label="진동 끄기">진동</button>
+    <button class="icon-btn" id="settingsBtn">설정</button>
   </div>
 </div>
 
@@ -230,12 +246,21 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--apricot); o
 </div>
 
 <!-- Pause -->
+<!-- Pause during a run; the same panel opens as Settings from the menu and game over -->
 <div class="screen dim" id="paused" hidden>
   <div class="card">
-    <div class="eyebrow">일시정지</div>
-    <div class="btns">
+    <div class="eyebrow" id="panelTitle">일시정지</div>
+    <div class="settings">
+      <button class="setting" id="setSound" role="switch" aria-checked="true"><span><b>소리</b><small>효과음과 배경 음악</small></span><i aria-hidden="true"></i></button>
+      <button class="setting" id="setVibe" role="switch" aria-checked="true"><span><b>진동</b><small>착지할 때 손끝으로 느끼는 진동</small></span><i aria-hidden="true"></i></button>
+      <button class="setting" id="setCalm" role="switch" aria-checked="false"><span><b>효과 줄이기</b><small id="calmNote">화면 흔들림, 번쩍임, 슬로모션을 꺼요</small></span><i aria-hidden="true"></i></button>
+    </div>
+    <div class="btns" id="pauseBtns">
       <button class="cta" id="resume">계속하기</button>
       <button class="ghost" id="pauseMenu">메뉴로</button>
+    </div>
+    <div class="btns" id="settingsBtns" hidden>
+      <button class="cta" id="settingsClose">닫기</button>
     </div>
   </div>
 </div>
@@ -326,7 +351,7 @@ const nativePlugin = name => {
 // the app build sets OH_CONFIG.operator = false to remove operator mode
 const OPERATOR = !(window.OH_CONFIG && window.OH_CONFIG.operator === false);
 const PLATFORM = (window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform()) || 'web';
-const SAVE_KEYS = ['oh_best', 'oh_trail', 'oh_muted', 'oh_vibe', 'oh_admin'];
+const SAVE_KEYS = ['oh_best', 'oh_trail', 'oh_muted', 'oh_vibe', 'oh_calm', 'oh_admin'];
 // must match the leaderboard ID created in App Store Connect
 const LEADERBOARD_ID = 'orbithop.best';
 
@@ -371,7 +396,10 @@ function game() {
   let planets, player, cam, particles, floaters, trail, score, combo, perfects, shake, flash, passed, cheated;
   let runTime = 0, rings = [], slowmo = 0, banner = null, lastTick = 0;
   let stars = [];
-  const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // "효과 줄이기": on when the device asks for reduced motion or the player turns it on in settings
+  const osReduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  let calm = store.get('oh_calm', false);
+  const calmFx = () => osReduced || calm;
 
   // Every 10 planets the sky moves into a new zone: new colors, a short name banner and a new key for the music.
   // Colors stay easy on the eyes on a screen you stare at: saturation 50% or less (reds and oranges 35% or less)
@@ -646,7 +674,7 @@ function game() {
     if (state !== 'play') return;
     if (admin.god) { respawn('무적'); return; }
     state = 'over';
-    $('pause').hidden = true;
+    $('pause').hidden = true; $('settingsBtn').hidden = false;
     sfx.die(); haptic('error');
     shake = 14; slowmo = 0.45;
     musicLevel(0.35);
@@ -752,20 +780,20 @@ function game() {
     show(null);
     $('score').hidden = false; $('score').textContent = '0';
     $('timeHud').textContent = '0:00';
-    $('runInfo').hidden = false; $('pause').hidden = false;
+    $('runInfo').hidden = false; $('pause').hidden = false; $('settingsBtn').hidden = true;
     musicLevel(1);
   }
   function goMenu() {
     state = 'menu';
     reset(0);
-    $('score').hidden = true; $('runInfo').hidden = true; $('pause').hidden = true;
+    $('score').hidden = true; $('runInfo').hidden = true; $('pause').hidden = true; $('settingsBtn').hidden = false;
     renderTrails(); syncBest();
     show('menu');
     musicLevel(0.5);
   }
   function pause() {
     if (state !== 'play') return;
-    state = 'paused'; show('paused');
+    state = 'paused'; panelMode('pause'); show('paused');
     musicLevel(0.35);
     setTimeout(() => $('resume').focus({ preventScroll: true }), 30);
   }
@@ -832,7 +860,7 @@ function game() {
     }
     musicTick();
     // brief slow motion on big moments (skip landings, crashes)
-    const warp = slowmo > 0 && !reducedMotion ? 0.35 : 1;
+    const warp = slowmo > 0 && !calmFx() ? 0.35 : 1;
     slowmo = Math.max(0, slowmo - raw);
     if (state !== 'paused') update(raw * warp * (state === 'play' ? admin.timeScale : 1));
     draw(now / 1000);
@@ -890,7 +918,7 @@ function game() {
     // camera follows the current planet
     const target = player.planet.y - H * 0.66;
     cam.y += (target - cam.y) * Math.min(1, dt * 3.2);
-    if (reducedMotion) shake = 0;
+    if (calmFx()) shake = 0;
     shake = Math.max(0, shake - dt * 30);
     cam.shakeX = (Math.random() - 0.5) * shake; cam.shakeY = (Math.random() - 0.5) * shake;
     flash = Math.max(0, flash - dt);
@@ -968,7 +996,7 @@ function game() {
         const left = Math.max(0, 1 - player.timer / p.life);
         ctx.strokeStyle = left < 0.3 ? '#ff6f91' : 'rgba(255,179,107,0.9)';
         // the last 30% pulses so running out of time is easy to notice
-        ctx.lineWidth = 4 * U * (left < 0.3 && !reducedMotion ? 1 + 0.35 * Math.abs(Math.sin(t * 9)) : 1); ctx.lineCap = 'round';
+        ctx.lineWidth = 4 * U * (left < 0.3 && !calmFx() ? 1 + 0.35 * Math.abs(Math.sin(t * 9)) : 1); ctx.lineCap = 'round';
         ctx.beginPath(); ctx.arc(p.x, p.y, p.orbitR + 9 * U, -Math.PI / 2, -Math.PI / 2 + left * Math.PI * 2); ctx.stroke();
         ctx.lineCap = 'butt';
       }
@@ -1055,11 +1083,11 @@ function game() {
       ctx.font = `700 ${12 * U}px "Gothic A1", sans-serif`;
       ctx.fillText(banner.title.split('').join(' '), W / 2, H * 0.28 - 30 * U);
       ctx.font = `${34 * U}px "Black Han Sans", sans-serif`;
-      ctx.fillText(banner.name, W / 2, H * 0.28 + (reducedMotion ? 0 : (1 - Math.min(1, (2.6 - life) * 3)) * 10 * U));
+      ctx.fillText(banner.name, W / 2, H * 0.28 + (calmFx() ? 0 : (1 - Math.min(1, (2.6 - life) * 3)) * 10 * U));
       ctx.globalAlpha = 1;
     }
 
-    if (flash > 0 && !reducedMotion) { ctx.fillStyle = `rgba(255,179,107,${flash * 0.35})`; ctx.fillRect(0, 0, W, H); }
+    if (flash > 0 && !calmFx()) { ctx.fillStyle = `rgba(255,179,107,${flash * 0.35})`; ctx.fillRect(0, 0, W, H); }
   }
 
   // ---------- Wiring ----------
@@ -1070,7 +1098,7 @@ function game() {
   window.addEventListener('keydown', e => {
     if (e.target.closest && e.target.closest('input')) return;
     if (state === 'play' && (e.code === 'Space' || e.code === 'Enter')) { e.preventDefault(); tap(); }
-    else if (e.code === 'Escape') { if (state === 'play') pause(); else if (state === 'paused') resume(); }
+    else if (e.code === 'Escape') { if (settingsOpen()) closeSettings(); else if (state === 'play') pause(); else if (state === 'paused') resume(); }
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
   // Android back button: pause the run or close the open panel; on the main menu, leave the app
@@ -1078,6 +1106,7 @@ function game() {
   if (appPlugin) appPlugin.addListener('backButton', () => {
     if (!$('how').hidden) show('menu');
     else if (!$('admin').hidden) $('aClose').click();
+    else if (settingsOpen()) closeSettings();
     else if (state === 'play') pause();
     else if (state === 'paused') resume();
     else if (state === 'over') goMenu();
@@ -1091,13 +1120,37 @@ function game() {
   $('pause').addEventListener('click', pause);
   $('resume').addEventListener('click', resume);
   $('pauseMenu').addEventListener('click', goMenu);
-  function syncMute() { $('mute').textContent = muted ? '무음' : '소리'; $('mute').setAttribute('aria-label', muted ? '소리 켜기' : '소리 끄기'); }
-  $('mute').addEventListener('click', () => {
-    muted = !muted; store.set('oh_muted', muted); syncMute(); audio();
+  // ---------- Settings panel (pause during a run, Settings elsewhere) ----------
+  let settingsReturn = null; // the screen to go back to when Settings was opened outside a run
+  function panelMode(mode) {
+    $('panelTitle').textContent = mode === 'pause' ? '일시정지' : '설정';
+    $('pauseBtns').hidden = mode !== 'pause';
+    $('settingsBtns').hidden = mode === 'pause';
+  }
+  const settingsOpen = () => settingsReturn !== null && !$('paused').hidden;
+  function openSettings() {
+    settingsReturn = state === 'over' ? 'over' : 'menu';
+    panelMode('settings'); show('paused');
+    $('settingsClose').focus({ preventScroll: true });
+  }
+  function closeSettings() { show(settingsReturn); settingsReturn = null; }
+  function syncSettings() {
+    $('setSound').setAttribute('aria-checked', String(!muted));
+    $('setVibe').setAttribute('aria-checked', String(vibe));
+    $('setCalm').setAttribute('aria-checked', String(calmFx()));
+    $('setCalm').disabled = osReduced;
+    $('calmNote').textContent = osReduced ? '기기 설정에서 "동작 줄이기"가 켜져 있어서 항상 켜져 있어요' : '화면 흔들림, 번쩍임, 슬로모션을 꺼요';
+    document.body.classList.toggle('calm', calmFx());
+  }
+  $('setSound').addEventListener('click', () => {
+    muted = !muted; store.set('oh_muted', muted); audio();
     if (master) master.gain.setTargetAtTime(muted ? 0 : 1, ac.currentTime, 0.05);
+    syncSettings(); sfx.click();
   });
-  function syncVibe() { $('vibe').textContent = vibe ? '진동' : '진동 끔'; $('vibe').setAttribute('aria-label', vibe ? '진동 끄기' : '진동 켜기'); $('vibe').setAttribute('aria-pressed', String(vibe)); }
-  $('vibe').addEventListener('click', () => { vibe = !vibe; store.set('oh_vibe', vibe); syncVibe(); haptic('medium'); });
+  $('setVibe').addEventListener('click', () => { vibe = !vibe; store.set('oh_vibe', vibe); syncSettings(); haptic('medium'); });
+  $('setCalm').addEventListener('click', () => { calm = !calm; store.set('oh_calm', calm); syncSettings(); sfx.click(); });
+  $('settingsBtn').addEventListener('click', openSettings);
+  $('settingsClose').addEventListener('click', closeSettings);
   window.addEventListener('resize', resize);
 
   if (!OPERATOR) admin = Object.assign({}, ADMIN_DEFAULTS);
@@ -1105,7 +1158,7 @@ function game() {
   $('rankMenu').addEventListener('click', openLeaderboard);
   $('rankOver').addEventListener('click', openLeaderboard);
   gcSignIn();
-  resize(); syncMute(); syncVibe(); syncBest(); syncAdminUi();
+  resize(); syncSettings(); syncBest(); syncAdminUi();
   reset(0); // menu shows a live orbit in the background
   if (OPERATOR && location.hash === '#admin') openAdmin();
   requestAnimationFrame(frame);
